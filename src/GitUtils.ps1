@@ -16,15 +16,26 @@
     System.String
 #>
 function Get-GitDirectory {
-    $pathInfo = Microsoft.PowerShell.Management\Get-Location
-    if (!$pathInfo -or ($pathInfo.Provider.Name -ne 'FileSystem')) {
+    param($path ="." )
+
+    $item = Get-Item $path
+
+    if (!$item) {
         $null
     }
     elseif ($Env:GIT_DIR) {
         $Env:GIT_DIR -replace '\\|/', [System.IO.Path]::DirectorySeparatorChar
     }
     else {
-        $currentDir = Get-Item $pathInfo -Force
+        if ($item -is [System.IO.DirectoryInfo])
+        {
+            $currentDir = $item
+        }
+        elseif($item -is [System.IO.FileInfo])
+        {
+            $currentDir = $item.Parent
+        }
+
         while ($currentDir) {
             $gitDirPath = Join-Path $currentDir.FullName .git
             if (Test-Path -LiteralPath $gitDirPath -PathType Container) {
@@ -171,7 +182,8 @@ function GetUniquePaths($pathCollections) {
 
 $castStringSeq = [Linq.Enumerable].GetMethod("Cast").MakeGenericMethod([string])
 
-function Get-GitStatus($gitDir = (Get-GitDirectory)) {
+function Get-GitStatus($dir=".") {
+    $gitDir = (Get-GitDirectory $dir)
     $settings = $Global:GitPromptSettings
     $enabled = (-not $settings) -or $settings.EnablePromptStatus
     if ($enabled -and $gitDir) {
@@ -232,7 +244,7 @@ function Get-GitStatus($gitDir = (Get-GitDirectory)) {
                 if ($cacheResponse.State) { $branch += "|" + $cacheResponse.State }
             } else {
                 dbg 'Getting status' $sw
-                $status = Invoke-Utf8ConsoleCommand { git -c core.quotepath=false -c color.status=false status --short --branch 2>$null }
+                $status = Invoke-Utf8ConsoleCommand { git -C $dir -c core.quotepath=false -c color.status=false status --short --branch 2>$null }
                 if($settings.EnableStashStatus) {
                     dbg 'Getting stash count' $sw
                     $stashCount = $null | git stash list 2>$null | measure-object | Select-Object -expand Count
@@ -325,6 +337,15 @@ function Get-GitStatus($gitDir = (Get-GitDirectory)) {
         if($sw) { $sw.Stop() }
         return $result
     }
+}
+
+function IsGitRepositoryRoot {
+    param ([string]$dir="")
+    $gitdir = Get-GitDirectory $dir
+    $dir = Resolve-Path $dir
+    $dir = $dir.TrimEnd("\","/")
+    
+    return $gitdir -eq "$dir\.git"
 }
 
 function InDisabledRepository {

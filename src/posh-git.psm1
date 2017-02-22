@@ -19,7 +19,8 @@ if ($psv.Major -lt 3 -and !$NoVersionWarn) {
 . $PSScriptRoot\GitParamTabExpansion.ps1
 . $PSScriptRoot\GitTabExpansion.ps1
 . $PSScriptRoot\TortoiseGit.ps1
-
+. $PSScriptRoot\New-CommandWrapper.ps1
+. $PSScriptRoot\GitLs.ps1
 if (!$Env:HOME) { $Env:HOME = "$Env:HOMEDRIVE$Env:HOMEPATH" }
 if (!$Env:HOME) { $Env:HOME = "$Env:USERPROFILE" }
 
@@ -117,12 +118,14 @@ if ($ForcePoshGitPrompt -or !$currentPromptDef -or ($currentPromptDef -eq $defau
 $ExecutionContext.SessionState.Module.OnRemove = {
     $global:VcsPromptStatuses = $global:VcsPromptStatuses | Where-Object { $_ -ne $PoshGitVcsPrompt }
 
+
     # Check if the posh-git prompt function itself has been replaced. If so, do not restore the prompt function
     $promptDef = if ($funcInfo = Get-Command prompt -ErrorAction SilentlyContinue) { $funcInfo.Definition }
     if ($promptDef -eq $poshGitPromptScriptBlock) {
         Set-Item Function:\prompt -Value ([scriptblock]::Create($defaultPromptDef))
         return
     }
+
 
     Write-Warning 'If your prompt function uses any posh-git commands, it will cause posh-git to be re-imported every time your prompt function is invoked.'
 }
@@ -147,6 +150,8 @@ $exportModuleMemberParams = @{
         'Add-SshKey',
         'Get-SshPath',
         'Update-AllBranches',
+        'Out-Default',
+        'IsGitRepositoryRoot'
         'tgit'
     )
 }
